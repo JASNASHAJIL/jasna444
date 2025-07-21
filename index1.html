@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Student Attendance System</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+</head>
+<body>
+  <div class="container py-4">
+    <div class="text-center mb-4">
+      <h2 class="fw-bold text-primary">Student Management System</h2>
+    </div>
+
+    <!-- Date Picker -->
+    <div class="text-center mb-4">
+      <label class="fw-semibold me-2">Select Date:</label>
+      <input type="date" id="attendanceDate" class="form-control d-inline-block w-auto" />
+    </div>
+
+    <!-- Attendance Counts -->
+    <div class="row text-center mb-4">
+      <div class="col-md-4">
+        <div class="card bg-success text-white">
+          <div class="card-body">
+            <h5>Present</h5>
+            <p id="presentCount" class="fs-4">0</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card bg-danger text-white">
+          <div class="card-body">
+            <h5>Absent</h5>
+            <p id="absentCount" class="fs-4">0</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card bg-warning text-dark">
+          <div class="card-body">
+            <h5>Leave</h5>
+            <p id="leaveCount" class="fs-4">0</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Student List -->
+    <div class="list-group mb-4" id="studentList"></div>
+
+    <!-- Action Buttons -->
+    <div class="d-flex justify-content-center flex-wrap gap-2">
+      <button class="btn btn-success" onclick="markAll('present')">Mark All Present</button>
+      <button class="btn btn-danger" onclick="markAll('absent')">Mark All Absent</button>
+      <button class="btn btn-secondary" onclick="resetAll()">Reset All</button>
+      <button class="btn btn-primary">Save Attendance</button>
+      <button class="btn btn-danger text-dark">Export CSV</button>
+    </div>
+  </div>
+
+  <script>
+    const students = ["jasna", "aldin", "evann", "namitha", "ashok","rasmi","jesy"];
+    let attendance = {};
+    const studentList = document.getElementById('studentList');
+    const dateInput = document.getElementById("attendanceDate");
+
+    // Generate student list
+    students.forEach((name, index) => {
+      const studentItem = document.createElement('div');
+      studentItem.className = "list-group-item d-flex justify-content-between align-items-center flex-wrap";
+      studentItem.setAttribute("data-name", name);
+      studentItem.innerHTML = `
+        <strong>${index + 1}. ${name}</strong>
+        <div class="btn-group mt-2 mt-sm-0" role="group">
+          <button class="btn btn-success status-btn" onclick="markStatus(this, '${name}', 'present')">Present</button>
+          <button class="btn btn-danger status-btn" onclick="markStatus(this, '${name}', 'absent')">Absent</button>
+          <button class="btn btn-warning status-btn text-dark" onclick="markStatus(this, '${name}', 'leave')">Leave</button>
+        </div>
+      `;
+      studentList.appendChild(studentItem);
+    });
+
+    function markStatus(button, name, status) {
+      const btnGroup = button.parentElement.querySelectorAll('.status-btn');
+      btnGroup.forEach(btn => btn.classList.remove('active'));
+      button.classList.add('active');
+      attendance[name] = status;
+      updateCounts();
+    }
+
+    function updateCounts() {
+      let present = 0, absent = 0, leave = 0;
+      for (let key in attendance) {
+        if (attendance[key] === 'present') present++;
+        else if (attendance[key] === 'absent') absent++;
+        else if (attendance[key] === 'leave') leave++;
+      }
+      document.getElementById('presentCount').textContent = present;
+      document.getElementById('absentCount').textContent = absent;
+      document.getElementById('leaveCount').textContent = leave;
+    }
+
+    function markAll(status) {
+      const allStudents = document.querySelectorAll('#studentList .list-group-item');
+      allStudents.forEach(item => {
+        const name = item.getAttribute('data-name');
+        const buttons = item.querySelectorAll('.status-btn');
+        buttons.forEach(btn => btn.classList.remove('active'));
+        buttons.forEach(btn => {
+          if (btn.textContent.toLowerCase() === status) {
+            btn.classList.add('active');
+            attendance[name] = status;
+          }
+        });
+      });
+      updateCounts();
+    }
+
+    function resetAll() {
+      const allButtons = document.querySelectorAll('.status-btn');
+      allButtons.forEach(btn => btn.classList.remove('active'));
+      attendance = {};
+      updateCounts();
+      saveAttendance(); // clear for current date
+    }
+
+    function saveAttendance() {
+      const date = dateInput.value;
+      if (!date) return alert("Please select a date first.");
+      const allData = JSON.parse(localStorage.getItem("attendanceData")) || {};
+      allData[date] = attendance;
+      localStorage.setItem("attendanceData", JSON.stringify(allData));
+      alert("Attendance saved for " + date);
+    }
+
+    function loadAttendance(date) {
+      const allData = JSON.parse(localStorage.getItem("attendanceData")) || {};
+      attendance = allData[date] || {};
+      document.querySelectorAll('#studentList .list-group-item').forEach(item => {
+        const name = item.getAttribute('data-name');
+        const buttons = item.querySelectorAll('.status-btn');
+        buttons.forEach(btn => btn.classList.remove('active'));
+        if (attendance[name]) {
+          buttons.forEach(btn => {
+            if (btn.textContent.toLowerCase() === attendance[name]) {
+              btn.classList.add('active');
+            }
+          });
+        }
+      });
+      updateCounts();
+    }
+
+    dateInput.addEventListener("change", () => {
+      loadAttendance(dateInput.value);
+    });
+
+    window.addEventListener("DOMContentLoaded", () => {
+      const today = new Date().toISOString().split('T')[0];
+      dateInput.value = today;
+      loadAttendance(today);
+    });
+
+    // Save button action
+    document.querySelector(".btn-primary").addEventListener("click", saveAttendance);
+
+    // Export to CSV
+    document.querySelector(".btn-danger.text-dark").addEventListener("click", () => {
+      if (!dateInput.value) return alert("Select a date first.");
+      let csv = "Name,Status\n";
+      students.forEach(name => {
+        csv += `${name},${attendance[name] || "Not Marked"}\n`;
+      });
+      const blob = new Blob([csv], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `attendance-${dateInput.value}.csv`;
+      a.click();
+    });
+  </script>
+</body>
+</html>
